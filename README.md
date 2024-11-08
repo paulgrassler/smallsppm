@@ -1,6 +1,6 @@
 # smallsppm
 
-Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implemenation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). I based this implementation on a [small progressive photon mapper by Hachisuka](https://cs.uwaterloo.ca/~thachisu/smallppm_exp.cpp) and used a kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM). Features include area light sources, a thin lens model, Motion Blur, the modified Phong model for glossy reflections and direct light sampling.
+Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implemenation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). I based this implementation on a [small progressive photon mapper by Hachisuka](https://cs.uwaterloo.ca/~thachisu/smallppm_exp.cpp) and used a kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM). Features include area light sources, a thin lens model, Motion Blur, the modified Phong model for glossy reflections, direct light sampling and some more.
 
 ## Quick Start
 To render a scene with smallsppm, first compile the program with e.g. g++:
