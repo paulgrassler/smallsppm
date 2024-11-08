@@ -27,7 +27,7 @@ std::vector<int> checkpoints = {10, 100, 1000, 2000, 3000, 4000, 5000, 6000, 700
 
 To create a new scene, one needs to create an array of scene objects and a scene description.
 
-#### Scene Objects
+#### <ins>Scene Objects</ins>
 
 There is a variety of different scene objects that can be used, which we will go over in this section. For each object, I will show the constructor and explain the different parameters.
 
@@ -79,7 +79,7 @@ The reflection type (refl_) can be chosen from:
 
 The other parameters are only relevant if the reflection type is PHONG. The user can specifiy the diffuse reflectivity (k_d_), the specular reflectivity (k_s_) and corresponding glossiness (gloss_), and a seperate albedo for specular reflections (sc_, typically this should not bet set).
 
-#### Creating the Scene Objects Array
+#### <ins>Creating the Scene Objects Array</ins>
 
 We need to create an array of object pointers to pass to the scene description later. An example can be seen below:
 
