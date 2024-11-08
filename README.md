@@ -79,7 +79,7 @@ The reflection type (refl_) can be chosen from:
 
 The other parameters are only relevant if the reflection type is PHONG. The user can specifiy the diffuse reflectivity (k_d_), the specular reflectivity (k_s_) and corresponding glossiness (gloss_), and a seperate albedo for specular reflections (sc_, typically this should not bet set).
 
-#### <ins>Creating the Scene Objects Array</ins>
+#### <ins>Scene Objects Array</ins>
 
 We need to create an array of object pointers to pass to the scene description later. An example can be seen below:
 
@@ -97,7 +97,7 @@ Object *scene1[] = {
   };
 ```
 
-#### Creating a new Scene Description
+#### <ins>Creating a new Scene Description</ins>
 
  The constructor for a scene description can be seen here:
 
