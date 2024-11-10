@@ -266,7 +266,7 @@ class Material
 struct HPoint {
 	Vec f,pos,nrm,flux,direct,d,fs;
 	BRDF *brdf; 
-	double r2; 
+	double r; 
 	double time;
 	unsigned int n; // n = N / ALPHA in the paper
 	int pix;
@@ -455,103 +455,6 @@ struct Cylinder : public Object {
 		}
 };
 
-class HitPointKDTreeNode {
-	public:
-		HPoint *hitpoint;
-		Vec min, max;
-		double maxr2;
-		HitPointKDTreeNode *ls, *rs;
-};
-bool cmpHitPointX(HPoint *a, HPoint *b) {
-    return a->pos.x < b->pos.x;
-}
-bool cmpHitPointY(HPoint *a, HPoint *b) {
-    return a->pos.y < b->pos.y;
-}
-bool cmpHitPointZ(HPoint *a, HPoint *b) {
-    return a->pos.z < b->pos.z;
-}
-Vec min(const Vec &a, const Vec &b) {
-    return Vec(std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z));
-}
-Vec max(const Vec &a, const Vec &b) {
-    return Vec(std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z));
-}
-class HitPointKDTree {
-	private:
-    	int n;
-    	HPoint** hitpoints;
-		HitPointKDTreeNode* build(int l, int r, int d) {
-			HitPointKDTreeNode *p = new HitPointKDTreeNode;
-			p->min = Vec(1e100, 1e100, 1e100);
-			p->max = p->min * (-1);
-			p->maxr2 = 0;
-			for (int i = l; i <= r; ++i) {
-				p->min = min(p->min, hitpoints[i]->pos);
-				p->max = max(p->max, hitpoints[i]->pos);
-				p->maxr2 = MAX(p->maxr2, hitpoints[i]->r2);
-			}
-			int m = (l + r) >> 1;
-			if (d == 0) 
-				std::nth_element(hitpoints + l, hitpoints + m, hitpoints + r + 1, cmpHitPointX);
-			else if (d == 1) 
-				std::nth_element(hitpoints + l, hitpoints + m, hitpoints + r + 1, cmpHitPointY);
-			else 
-				std::nth_element(hitpoints + l, hitpoints + m, hitpoints + r + 1, cmpHitPointZ);
-			p->hitpoint = hitpoints[m];
-			if (l <= m - 1) p->ls = build(l, m - 1, (d + 1) % 3); else p->ls = nullptr;
-			if (m + 1 <= r) p->rs = build(m + 1, r, (d + 1) % 3); else p->rs = nullptr;
-			return p;
-		}
-		void del(HitPointKDTreeNode *p) {
-			if (p->ls) del(p->ls);
-			if (p->rs) del(p->rs);
-			delete p;
-		}
-	public:
-		HitPointKDTreeNode *root;
-		HitPointKDTree(std::vector<HPoint*> *hitpoints) {
-			n = hitpoints->size();
-			this->hitpoints = new HPoint*[n];
-			for (int i = 0; i < n; ++i)
-				this->hitpoints[i] = (*hitpoints)[i];
-			root = build(0, n - 1, 0);
-		}
-		~HitPointKDTree() {
-			if (!root) return;
-			del(root);
-			delete[] hitpoints;
-		}
-		void update(HitPointKDTreeNode *p, Vec photon_pos, const Vec fl, const Ray r, const Vec n, const Object &obj) {
-			if (!p) return;
-			double mind = 0;
-			if (photon_pos.x > p->max.x) mind += pow((photon_pos.x - p->max.x), 2);
-			if (photon_pos.x < p->min.x) mind += pow((p->min.x - photon_pos.x), 2);
-			if (photon_pos.y > p->max.y) mind += pow((photon_pos.y - p->max.y), 2);
-			if (photon_pos.y < p->min.y) mind += pow((p->min.y - photon_pos.y), 2);
-			if (photon_pos.z > p->max.z) mind += pow((photon_pos.z - p->max.z), 2);
-			if (photon_pos.z < p->min.z) mind += pow((p->min.z - photon_pos.z), 2);
-			if (mind > p->maxr2) return;
-			Vec v = photon_pos - p->hitpoint->pos;
-			if (p->hitpoint->valid && (p->hitpoint->nrm.dot(n) > 1e-3) && v.dot(v) <= p->hitpoint->r2 && r.time == p->hitpoint->time) {
-				HPoint* hitpoint = p->hitpoint;
-				double g = (hitpoint->n*ALPHA+ALPHA) / (hitpoint->n*ALPHA+1);
-				hitpoint->r2=hitpoint->r2*g; 
-				hitpoint->n++;
-				Vec brdf_factor;
-				hitpoint->brdf->evaluateBRDF(hitpoint->nrm, hitpoint->d, hitpoint->f, r.d * -1, &brdf_factor);
-				hitpoint->flux=(hitpoint->flux+brdf_factor.mul(fl)) * g;
-			}  
-			if (p->ls) update(p->ls, photon_pos, fl, r, n, obj);
-			if (p->rs) update(p->rs, photon_pos, fl, r, n, obj);
-			p->maxr2 = p->hitpoint->r2;
-			if (p->ls && p->ls->hitpoint->r2 > p->maxr2)
-				p->maxr2 = p->ls->hitpoint->r2;
-			if (p->rs && p->rs->hitpoint->r2 > p->maxr2)
-				p->maxr2 = p->rs->hitpoint->r2;
-		}
-};
-
 class SceneDescription {
 	public:
 		struct Object **scene;
@@ -568,9 +471,156 @@ class SceneDescription {
 		{}
 };
 
-HitPointKDTree *hitpoint_kdtree;
-std::vector<HPoint *> *hitpoints;
 SceneDescription *curr_scene_desc;
+
+class HashGridList {
+	private:
+		HPoint *id;
+		HashGridList *next;
+	public:
+		HashGridList *add(HPoint *hp)
+		{
+			HashGridList *temp = new HashGridList;
+			temp->id = hp;
+			temp->next = this;
+			return temp;
+		}
+		HashGridList() : id(NULL), next(NULL) {}
+		~HashGridList()
+		{
+			if (next != NULL)
+				delete next;
+		}
+		void update(Vec photon_pos, const Vec fl, const Ray r, const Vec n, const Object &obj)
+		{
+			HashGridList *list = this;
+			while (list != NULL) {
+				HPoint *hitpoint = list->id;
+				list = list->next;
+				Vec v = hitpoint->pos - photon_pos;
+				// check normals to be closer than 90 degree (avoids some edge brightning)
+				if (hitpoint->valid && (hitpoint->nrm.dot(n) > 1e-3) && (v.dot(v) <= (hitpoint->r * hitpoint->r)) && r.time == hitpoint->time) {
+					double g = (hitpoint->n*ALPHA+ALPHA) / (hitpoint->n*ALPHA+1.0); // unlike N in the paper, hitpoint->n stores "N / ALPHA" to make it an integer value
+					hitpoint->r=hitpoint->r*sqrt(g); 
+					hitpoint->n++;
+					Vec brdf_factor;
+					hitpoint->brdf->evaluateBRDF(hitpoint->nrm, hitpoint->d, hitpoint->f, r.d * -1, &brdf_factor);
+					hitpoint->flux=(hitpoint->flux+brdf_factor.mul(fl)) * g;
+				}
+			}
+		}
+};
+
+class HashGrid {
+	private: 
+		HashGridList **hash_grid;
+		unsigned int num_hash;
+		double hash_size;
+		AABB hitpoint_bounds;
+
+		unsigned int hash(const int ix, const int iy, const int iz) 
+		{
+			return (unsigned int)((ix*73856093)^(iy*19349663)^(iz*83492791))%num_hash;
+		}
+
+	public:
+
+		HashGrid(const int w, const int h, std::vector<HPoint *> *hitpoints)
+		{
+			if (curr_scene_desc->r_0 == 0.0) //estimate intial radius
+			{
+				hitpoint_bounds.reset();
+				for (int y=0; y<h; y++){
+					for (int x=0; x<w; x++) {
+						HPoint *hp = hitpoints->at(y * w + x);
+						hitpoint_bounds.fit(hp->pos);
+					}
+				}
+
+				Vec ssize = hitpoint_bounds.max - hitpoint_bounds.min;
+				curr_scene_desc->r_0 = ((ssize.x + ssize.y + ssize.z) / 3.0) / ((w + h) / 2.0) * 2.0;
+
+				printf("Estimated Initial Radius: %f\n", curr_scene_desc->r_0);
+				
+				for (int y=0; y<h; y++){
+					for (int x=0; x<w; x++) {
+						HPoint *hp = hitpoints->at(y * w + x);
+						hp->r = curr_scene_desc->r_0;
+					}
+				}
+			}
+			// determine hash table size
+			// we now find the bounding box of all the measurement points inflated by the initial radius
+			hitpoint_bounds.reset(); 
+
+			double max_radius = 0;
+			int vphoton = 0; 
+			for (int y=0; y<h; y++){
+				for (int x=0; x<w; x++) {
+					HPoint *hp = hitpoints->at(y * w + x);
+					if (!hp->valid)
+						continue;
+					double hp_r = hp->r;
+					hitpoint_bounds.fit(hp->pos-hp_r); 
+					hitpoint_bounds.fit(hp->pos+hp_r);
+					max_radius = MAX(max_radius, hp_r);
+					vphoton++;
+				}
+			}
+			// make each grid cell two times larger than the initial radius
+			hash_size=1.0/(max_radius*2.0); 
+			num_hash = vphoton; 
+
+			// build the hash table
+			hash_grid=new HashGridList*[num_hash];
+			for (unsigned int i=0; i<num_hash;i++) hash_grid[i] = NULL;
+
+			for (int y=0; y<h; y++){
+				for (int x=0; x<w; x++) {
+					HPoint *hp = hitpoints->at(y * w + x); 
+					if (!hp->valid)
+						continue;
+					Vec BMin = ((hp->pos - max_radius) - hitpoint_bounds.min) * hash_size;
+					Vec BMax = ((hp->pos + max_radius) - hitpoint_bounds.min) * hash_size;
+					for (int iz = abs(int(BMin.z)); iz <= abs(int(BMax.z)); iz++)
+					{
+						for (int iy = abs(int(BMin.y)); iy <= abs(int(BMax.y)); iy++)
+						{
+							for (int ix = abs(int(BMin.x)); ix <= abs(int(BMax.x)); ix++)
+							{
+								int hv=hash(ix,iy,iz); 
+								hash_grid[hv]=hash_grid[hv]->add(hp);
+							}
+						}
+					}
+				}
+			}
+		}
+		~HashGrid()
+		{
+			for (unsigned int i = 0; i < num_hash; i++)
+			{
+				HashGridList *l = hash_grid[i];
+				if (l != NULL)
+					delete l;
+			}
+			delete hash_grid;
+		}
+		void update(Vec photon_pos, const Vec fl, const Ray r, const Vec n, const Object &obj)
+		{
+			Vec hh = (photon_pos-hitpoint_bounds.min) * hash_size;
+			int ix = abs(int(hh.x)), iy = abs(int(hh.y)), iz = abs(int(hh.z));
+			// strictly speaking, we should use #pragma omp critical here.
+			// it usually works without an artifact due to the fact that photons are 
+			// rarely accumulated to the same measurement points at the same time (especially with QMC).
+			// it is also significantly faster.
+			{
+				HashGridList* list = hash_grid[hash(ix, iy, iz)];
+				if (list != NULL) 
+					list->update(photon_pos, fl, r, n, obj);
+			}
+		}
+};
 
 std::vector<Triangle *> createBlock(float width, float height, float depth, bool without_top = false)
 {
@@ -650,6 +700,8 @@ std::vector<Triangle *> createRectangle(float width, float height, float depth, 
 		exit(-1);
 	}
 }
+
+HashGrid *hash_grid;
 
 //SCENES
 #define BOX_HALF_X 2.6
@@ -828,7 +880,7 @@ void saveImage(std::vector<HPoint *> *hitpoints, int w, int h, int iterations, i
 	Vec *c = new Vec[w * h];
 	for (auto hp : *hitpoints) {
 		int i = hp->pix;
-		c[i]=c[i]+hp->flux*(1.0/(PI*hp->r2*iterations*photons_per_pass)) + hp->direct / iterations;
+		c[i]=c[i]+hp->flux*(1.0/(PI*hp->r*hp->r*iterations*photons_per_pass)) + hp->direct / iterations;
 	}
 	std::string time_str = std::string("");
 	std::stringstream stream;
@@ -895,7 +947,7 @@ void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throug
 	{
 		if (!brdf->isSpecular() && !brdf->isGlossy() && (dpt > 1 || !curr_scene_desc->direct_sampling)) //ignore direct light, was already accounted for in the measurement point
 		{
-			hitpoint_kdtree->update(hitpoint_kdtree->root, x, fl, r, n, obj);
+			hash_grid->update(x, fl, r, n, obj);
 		}
 		Vec new_d;
 		double pdf = 0.0;
@@ -934,27 +986,53 @@ int main(int argc, char *argv[]) {
 
 	//set up output folder
 	namespace fs = std::filesystem;
-	std::stringstream radius_stream;
-	radius_stream << std::fixed << std::setprecision(4) << curr_scene_desc->r_0;
-	std::string radius_string = radius_stream.str();
 	auto time_stamp = std::time(nullptr);
 	auto time_stamp_m = *std::localtime(&time_stamp);
 	std::ostringstream oss;
 	oss << std::put_time(&time_stamp_m, "%Y-%m-%d_%H-%M-%S");
 	std::string date_time_string = oss.str();
-	std::string folder_name = ("./output/sppm_scene_" + std::to_string(scene_nr) + "_" + radius_string + "_" + date_time_string).c_str();
+	std::string folder_name = ("./output/sppm_scene_" + std::to_string(scene_nr) + "_" + date_time_string).c_str();
 	fs::create_directories(folder_name);
+
+	//save metadata
+	std::ofstream metadata_file((folder_name + "/metadata.txt").c_str());
+
+	metadata_file << "scene_nr: " << scene_nr << std::endl;
+	metadata_file << "samps: " << samps << std::endl;
+	metadata_file << "photons_per_pass: " << photons_per_pass << std::endl;
+	metadata_file << "w: " << w << std::endl;
+	metadata_file << "h: " << h << std::endl;
+	metadata_file << "sensor_width: " << sensor_width << std::endl;
+	metadata_file << "sensor_height: " << sensor_height << std::endl;
+	metadata_file << "sensor_origin: " << sensor_origin.x << " " << sensor_origin.y << " " << sensor_origin.z << std::endl;
+	metadata_file << "sensor_direction: " << sensor_direction.x << " " << sensor_direction.y << " " << sensor_direction.z << std::endl;
+	metadata_file << "r_0: " << curr_scene_desc->r_0 << std::endl;
+	metadata_file << "direct_sampling: " << curr_scene_desc->direct_sampling << std::endl;
+	metadata_file << "motion_blur: " << curr_scene_desc->motion_blur << std::endl;
+	metadata_file << "dof: " << curr_scene_desc->dof << std::endl;
+	metadata_file << "S_i: " << S_i << std::endl;
+	metadata_file << "S_o: " << curr_scene_desc->S_o << std::endl;
+	metadata_file << "f_stop: " << curr_scene_desc->f_stop << std::endl;
+	metadata_file << "max_time: " << max_time << std::endl;
+
+	metadata_file.close();
+
 	printf("Rendering Scene %lld\n", scene_nr);
 	auto tstart = std::chrono::system_clock::now();
 
+	if (curr_scene_desc->r_0 != 0.0)
+	{
+		printf("Selected Initial Radius: %f\n", curr_scene_desc->r_0);
+	}
+
 	//initialize hitpoints
-	hitpoints = new std::vector<HPoint*>;
+	std::vector<HPoint*> *hitpoints = new std::vector<HPoint*>;
 	for (int y=0; y<h; y++){
 		for (int x=0; x<w; x++) {
 			HPoint *hitpoint = new HPoint;
 			hitpoint->flux = Vec();
 			hitpoint->direct = Vec();
-			hitpoint->r2 = curr_scene_desc->r_0 * curr_scene_desc->r_0;
+			hitpoint->r = curr_scene_desc->r_0;
 			hitpoint->n = 0;
 			hitpoint->pix = x + y * w;
 			hitpoints->push_back(hitpoint);
@@ -1002,9 +1080,9 @@ int main(int argc, char *argv[]) {
 		}
 
 		//set up kdtree and populate it with hitpoints
-		if (hitpoint_kdtree)
-			delete hitpoint_kdtree;
-		hitpoint_kdtree = new HitPointKDTree(hitpoints);
+		if (hash_grid)
+			delete hash_grid;
+		hash_grid = new HashGrid(w, h, hitpoints);
 		vw=Vec(1,1,1);
 
 		#pragma omp parallel for schedule(dynamic, 1)	//PHOTON PASS
@@ -1032,5 +1110,5 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	delete hitpoints;
-	delete hitpoint_kdtree;
+	delete hash_grid;
 }
