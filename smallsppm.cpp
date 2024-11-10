@@ -679,7 +679,7 @@ std::vector<Triangle *> createRectangle(float width, float height, float depth, 
 	float w = width / 2.0;
 	float h = height / 2.0;
 	float d = depth / 2.0;
-	if (d == 0)
+	if (d == 0 && !flip)
 	{
 		std::vector<Triangle *> rect = {
 			new Triangle(Vec(-w, -h, 0), Vec(w, -h, 0), Vec(w, h, 0)), // Front
@@ -688,7 +688,16 @@ std::vector<Triangle *> createRectangle(float width, float height, float depth, 
 
 		return rect;
 	}
-	else if (w == 0)
+	else if (d == 0 && flip)
+	{
+		std::vector<Triangle *> rect = {
+			new Triangle(Vec(w, -h, -d), Vec(-w, -h, -d), Vec(-w, h, -d)), // Back
+			new Triangle(Vec(w, -h, -d), Vec(-w, h, -d), Vec(w, h, -d)),   // Back
+		};
+
+		return rect;
+	}
+	else if (w == 0 && !flip)
 	{
 		std::vector<Triangle *> rect = {
 			new Triangle(Vec(0, -h, -d), Vec(0, -h, d), Vec(0, h, d)), // Left
@@ -696,6 +705,15 @@ std::vector<Triangle *> createRectangle(float width, float height, float depth, 
 		};
 
 		return rect;
+	}
+	else if (w == 0 && flip)
+	{
+		std::vector<Triangle *> rect = {
+		new Triangle(Vec(w, -h, d), Vec(w, -h, -d), Vec(w, h, -d)),	   // Right
+		new Triangle(Vec(w, -h, d), Vec(w, h, -d), Vec(w, h, d)),	   // Right
+		};
+
+		return rect;		
 	}
 	else if (h == 0 && !flip)
 	{
