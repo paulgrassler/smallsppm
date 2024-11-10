@@ -1,6 +1,6 @@
 # smallsppm
 
-Compact (single source file) implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implemenation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). I based this implementation on a [small progressive photon mapper by Hachisuka](https://cs.uwaterloo.ca/~thachisu/smallppm_exp.cpp) and used a kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM). Features include area light sources, a thin lens model for Depth of Field, Motion Blur, the modified Phong model for glossy reflections, direct light sampling and some more.
+Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implementation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). An existing kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM) was used. The most important features include area light sources, a thin lens model for Depth of Field, Motion Blur for simple sphere movements, the modified Phong model for glossy reflections, and direct light sampling.
 
 ## Quick Start
 To render a scene with smallsppm, first compile the program with e.g. g++:
@@ -55,7 +55,7 @@ Triangles are defined by the position of their three points (a_, b_, c_). They s
 Cylinder(double rad_, double length_, Vec p_, Vec e_, Material mat_)
 ```
 
-The cylinder constructor takes a radius (rad_), the length of the cylinder (length_), its position (p_), emission (e_) and material (mat_). Only upright cylinders are supported.
+The cylinder constructor takes a radius (rad_), the length of the cylinder (length_), its position (p_), emission (e_), and material (mat_). Only upright cylinders are supported.
 
 **Material and BRDF**
 
@@ -67,7 +67,7 @@ Material(Vec c_, BRDF *brdf_)
 
 It takes the albedo (c_) and a pointer to a BRDF (brdf_) as input parameters.
 
-These are the three different BRDF that are currently implemented:
+These are the three different BRDFs that are currently implemented:
 
 - BRDF_PHONG (modified Phong model)
 - BRDF_SPEC (perfect specular reflection)
@@ -80,7 +80,7 @@ BRDF_PHONG(double k_d_ = 1.0, double k_s_ = 0.0, double gloss_ = 1.0)
 BRDF_REFR(double ior_ = 1.5)
 ```
 
-The BRDF_PHONG constructor takes the diffuse reflectivity (k_d_), the specular reflectivity (k_s_) and the glossiness (gloss_) which controls how narrow the specular lobe is. The BRDF_REFR only needs the index of refraction (ior_).
+The BRDF_PHONG constructor takes the diffuse reflectivity (k_d_), the specular reflectivity (k_s_), and the glossiness (gloss_) which controls how narrow the specular lobe is. The BRDF_REFR only needs the index of refraction (ior_).
 
 #### <ins>Scene Objects Array</ins>
 
@@ -108,11 +108,11 @@ Object *scene1[] = {
  SceneDescription(struct Object **scene_, int scene_size_, Vec sensor_origin_, Vec sensor_direction_, Object *light_, double r_0_, bool direct_sampling_ = false, bool motion_blur_ = false, bool dof_ = false, double S_o_ = 0.0, double f_stop_ = 1.0)
  ```
 
- The first parameter is a pointer to the aforementioned scene objects array. The number of objects should be passed as scene_size_. The user can specify the position and direction of the camera sensor (sensor_origin_ and sensor_direction_). A pointer to the actual light source inside the scene objects array needs to be passed. **Only one light source per scene is supported at the moment.**. An initial radius for the hit points needs to be specified (r_0_). The rest of the rendering options are:
+ The first parameter is a pointer to the aforementioned scene objects array. The number of objects should be passed as scene_size_. The user can specify the position and direction of the camera sensor (sensor_origin_ and sensor_direction_). A pointer to the actual light source inside the scene objects array has to be passed. **Only one light source per scene is supported at the moment.**. An initial radius for the hit points needs to be specified (r_0_). The rest of the rendering options are:
 
  -  Direct Light Sampling (direct_sampling_): if activated, direct light will be accounted for in the Ray Tracing Passes, which can increase performance as the first bounces of Photons can be ignored.
  - Motion Blur (motion_blur_): if activated, SPPM will sample a timestamp at the beginning of each iteration and move the scene objects as specified by their parameters. (**Only Spheres can be moved at the moment.**).
- - Depth of Field (dof_): if activated, camera rays will sample lens positions to emulate the behavious of real world cameras (thin lens model). An object distance (S_o) and f-Stop number (f_stop_) can be specified.
+ - Depth of Field (dof_): if activated, camera rays will sample lens positions to emulate the behavior of real-world cameras (thin lens model). An object distance (S_o) and f-stop number (f_stop_) can be specified.
 
  When you are finished with your scene description, just include it in the scene_descriptors array:
 

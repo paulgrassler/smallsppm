@@ -491,6 +491,24 @@ public:
 	}
 };
 
+class SceneDescription
+{
+public:
+	struct Object **scene;
+	int scene_size;
+	Vec sensor_origin, sensor_direction;
+	Object *light;
+	double r_0;
+	bool direct_sampling;
+	bool motion_blur;
+	bool dof;
+	double S_o, f_stop;
+	SceneDescription(struct Object **scene_, int scene_size_, Vec sensor_origin_, Vec sensor_direction_, Object *light_, double r_0_, bool direct_sampling_ = false, bool motion_blur_ = false, bool dof_ = false, double S_o_ = 0.0, double f_stop_ = 1.0)
+		: scene(scene_), scene_size(scene_size_), sensor_origin(sensor_origin_), sensor_direction(sensor_direction_.norm()), light(light_), r_0(r_0_), direct_sampling(direct_sampling_), motion_blur(motion_blur_), dof(dof_), S_o(S_o_), f_stop(f_stop_)
+	{
+	}
+};
+
 class HitPointKDTreeNode
 {
 public:
@@ -622,26 +640,152 @@ public:
 	}
 };
 
-class SceneDescription
-{
-public:
-	struct Object **scene;
-	int scene_size;
-	Vec sensor_origin, sensor_direction;
-	Object *light;
-	double r_0;
-	bool direct_sampling;
-	bool motion_blur;
-	bool dof;
-	double S_o, f_stop;
-	SceneDescription(struct Object **scene_, int scene_size_, Vec sensor_origin_, Vec sensor_direction_, Object *light_, double r_0_, bool direct_sampling_ = false, bool motion_blur_ = false, bool dof_ = false, double S_o_ = 0.0, double f_stop_ = 1.0)
-		: scene(scene_), scene_size(scene_size_), sensor_origin(sensor_origin_), sensor_direction(sensor_direction_.norm()), light(light_), r_0(r_0_), direct_sampling(direct_sampling_), motion_blur(motion_blur_), dof(dof_), S_o(S_o_), f_stop(f_stop_)
-	{
-	}
-};
-
+//Global Class Instances
 HitPointKDTree *hitpoint_kdtree;
 SceneDescription *curr_scene_desc;
+
+inline bool intersect(const Ray &r, double &t, int &id, Vec &normal) // find the closest scene intersection
+{
+	int n = curr_scene_desc->scene_size;
+	double d, inf = 1e20;
+	t = inf;
+	Vec normal_temp;
+	for (int i = 0; i < n; i++)
+	{
+		d = curr_scene_desc->scene[i]->intersect(r, normal_temp);
+		if (d < t)
+		{
+			t = d;
+			id = i;
+			normal = normal_temp.norm();
+		}
+	}
+	return t < inf;
+}
+
+Vec uniformDiskSample(double radius, Vec center)
+{
+	double sample_r = sqrt(radius * radius * rand01());
+	double sample_theta = rand01() * 2.0 * PI;
+	Vec sample = Vec();
+	sample.x = center.x + sample_r * cos(sample_theta);
+	sample.y = center.y + sample_r * sin(sample_theta);
+	sample.z = center.z;
+	return sample;
+}
+
+Vec concentricDiskSample()
+{
+	double u1 = rand01();
+	double u2 = rand01();
+	double uOffsetX = 2.f * u1 - 1;
+	double uOffsetY = 2.f * u2 - 1;
+	if (uOffsetX == 0 && uOffsetY == 0)
+		return Vec(0, 0);
+	double theta, r;
+	if (abs(uOffsetX) > abs(uOffsetY))
+	{
+		r = uOffsetX;
+		theta = (PI / 4) * (uOffsetY / uOffsetX);
+	}
+	else
+	{
+		r = uOffsetY;
+		theta = PI / 2 - (PI / 4) * (uOffsetX / uOffsetY);
+	}
+	return Vec(cos(theta), sin(theta)) * r;
+}
+
+Vec lightSampleDirect(Ray r, Vec pos, Vec norm, int hit_id, const Object &hit_obj) // assumes hit_obj has PHONG BRDF
+{
+	if (hit_obj.mat.brdf->isSpecular())
+	{
+		printf("lightSampleDirect() called on specular material\n");
+		exit(1);
+	}
+	Vec direct_light = Vec();
+	for (int i = 0; i < curr_scene_desc->scene_size; i++)
+	{
+		const Object &l_obj = *(curr_scene_desc->scene[i]);
+		if ((l_obj.e.x <= 0 && l_obj.e.y <= 0 && l_obj.e.z <= 0) || i == hit_id)
+			continue; // skip non-lights
+		float pos_pdf;
+		Vec light_normal;
+		Vec sample_pos = l_obj.samplePos(&pos_pdf, &light_normal);
+		Vec sample_dir = (sample_pos - pos).norm();
+		double cos_theta_light = light_normal.dot((sample_dir * -1));
+		Vec sampled_light = (cos_theta_light > 0.0) ? l_obj.e : Vec();
+		if ((sampled_light.x <= 0 && sampled_light.y <= 0 && sampled_light.z <= 0) || pos_pdf <= 0.0)
+			continue;
+		Vec temp_n;
+		double t;
+		int id = -1;
+		if (intersect(Ray(pos, sample_dir), t, id, temp_n) && id == i)	// shadow ray
+		{
+			double dist = (sample_pos - pos).length();
+			Vec brdf_factor;
+			hit_obj.mat.brdf->evaluateBRDF(norm, r.d, hit_obj.mat.c, sample_dir, &brdf_factor);
+			direct_light = direct_light + brdf_factor.mul(sampled_light * abs(sample_dir.dot(norm))) * (1.0 / pos_pdf) * (cos_theta_light / (dist * dist));
+		}
+	}
+	return direct_light;
+}
+
+void lightSampleE(Object *light, Ray *r, Vec *f) // Cosine Importance Sampling of Photon Directions
+{
+	float pos_pdf;
+	Vec light_normal;
+	Vec sample_pos = light->samplePos(&pos_pdf, &light_normal);
+	Vec disk_sample = concentricDiskSample();
+	double z = sqrt(MAX(0.0, 1 - disk_sample.x * disk_sample.x - disk_sample.y * disk_sample.y));
+	Vec sample_dir = Vec(disk_sample.x, disk_sample.y, z);
+	Vec v1, v2, n;
+	n = light_normal;
+	v1 = ((fabs(n.x) > .1 ? Vec(0, 1) : Vec(1)) % n).norm();
+	v2 = n % v1;
+	sample_dir = v1 * sample_dir.x + v2 * sample_dir.y + n * sample_dir.z;
+	*r = Ray(sample_pos, sample_dir);
+	float dir_pdf = MAX(light_normal.dot(sample_dir), 0) / PI;
+	if (dir_pdf <= 0.0)
+	{
+		*f = Vec();
+		return;
+	}
+	*f = light->e * MAX(light_normal.dot(sample_dir), 0) * (1.0 / pos_pdf) * (1.0 / dir_pdf);
+}
+
+bool rayPlaneIntersection(Vec plane_point, Vec plane_normal, Ray r, double *t)
+{
+	double denom = plane_normal.dot(r.d);
+	if (abs(denom) > EPS)
+	{
+		*t = (plane_point - r.o).dot(plane_normal) / denom;
+		if ((*t) >= 0)
+			return true;
+	}
+	return false;
+}
+
+void saveImage(std::vector<HPoint *> *hitpoints, int w, int h, int iterations, int photons_per_pass, double elapsed_time, int scene_nr, std::string folder_name, bool sppm)
+{
+	Vec *c = new Vec[w * h];
+	for (auto hp : *hitpoints)
+	{
+		int i = hp->pix;
+		c[i] = c[i] + hp->flux * (1.0 / (PI * hp->r2 * iterations * photons_per_pass)) + hp->direct / iterations;
+	}
+	std::string time_str = std::string("");
+	std::stringstream stream;
+	stream << std::fixed << std::setprecision(2) << elapsed_time;
+	time_str = stream.str() + std::string("s");
+	FILE *file = fopen((folder_name + "/" + time_str + "_" + std::to_string(iterations) + "r" + ".ppm").c_str(), "w");
+	fprintf(file, "P3\n%d %d\n%d\n", w, h, 255);
+	for (int i = w * h; i--;)
+	{
+		fprintf(file, "%d %d %d ", toInt(c[i].x), toInt(c[i].y), toInt(c[i].z));
+	}
+	fclose(file);
+}
 
 std::vector<Triangle *> createBlock(float width, float height, float depth, bool without_top = false)
 {
@@ -764,146 +908,6 @@ SceneDescription scene_desc1(scene1, sizeof(scene1) / sizeof(Object *),
 							 default_sensor_origin, default_sensor_direction, scene1[sizeof(scene1) / sizeof(Object *) - 1], 0.03, true);
 
 SceneDescription scene_descriptors[] = {scene_desc1};
-
-inline bool intersect(const Ray &r, double &t, int &id, Vec &normal) // find the closest intersection
-{
-	int n = curr_scene_desc->scene_size;
-	double d, inf = 1e20;
-	t = inf;
-	Vec normal_temp;
-	for (int i = 0; i < n; i++)
-	{
-		d = curr_scene_desc->scene[i]->intersect(r, normal_temp);
-		if (d < t)
-		{
-			t = d;
-			id = i;
-			normal = normal_temp.norm();
-		}
-	}
-	return t < inf;
-}
-
-bool rayPlaneIntersection(Vec plane_point, Vec plane_normal, Ray r, double *t)
-{
-	double denom = plane_normal.dot(r.d);
-	if (abs(denom) > EPS)
-	{
-		*t = (plane_point - r.o).dot(plane_normal) / denom;
-		if ((*t) >= 0)
-			return true;
-	}
-	return false;
-}
-Vec uniformDiskSample(double radius, Vec center)
-{
-	double sample_r = sqrt(radius * radius * rand01());
-	double sample_theta = rand01() * 2.0 * PI;
-	Vec sample = Vec();
-	sample.x = center.x + sample_r * cos(sample_theta);
-	sample.y = center.y + sample_r * sin(sample_theta);
-	sample.z = center.z;
-	return sample;
-}
-
-Vec concentricDiskSample()
-{
-	double u1 = rand01();
-	double u2 = rand01();
-	double uOffsetX = 2.f * u1 - 1;
-	double uOffsetY = 2.f * u2 - 1;
-	if (uOffsetX == 0 && uOffsetY == 0)
-		return Vec(0, 0);
-	double theta, r;
-	if (abs(uOffsetX) > abs(uOffsetY))
-	{
-		r = uOffsetX;
-		theta = (PI / 4) * (uOffsetY / uOffsetX);
-	}
-	else
-	{
-		r = uOffsetY;
-		theta = PI / 2 - (PI / 4) * (uOffsetX / uOffsetY);
-	}
-	return Vec(cos(theta), sin(theta)) * r;
-}
-Vec lightSampleDirect(Ray r, Vec pos, Vec norm, int hit_id, const Object &hit_obj) // assumes hit_obj has PHONG BRDF
-{
-	if (hit_obj.mat.brdf->isSpecular())
-	{
-		printf("lightSampleDirect() called on specular material\n");
-		exit(1);
-	}
-	Vec direct_light = Vec();
-	for (int i = 0; i < curr_scene_desc->scene_size; i++)
-	{
-		const Object &l_obj = *(curr_scene_desc->scene[i]);
-		if ((l_obj.e.x <= 0 && l_obj.e.y <= 0 && l_obj.e.z <= 0) || i == hit_id)
-			continue; // skip non-lights
-		float pos_pdf;
-		Vec light_normal;
-		Vec sample_pos = l_obj.samplePos(&pos_pdf, &light_normal);
-		Vec sample_dir = (sample_pos - pos).norm();
-		double cos_theta_light = light_normal.dot((sample_dir * -1));
-		Vec sampled_light = (cos_theta_light > 0.0) ? l_obj.e : Vec();
-		if ((sampled_light.x <= 0 && sampled_light.y <= 0 && sampled_light.z <= 0) || pos_pdf <= 0.0)
-			continue;
-		Vec temp_n;
-		double t;
-		int id = -1;
-		if (intersect(Ray(pos, sample_dir), t, id, temp_n) && id == i)	// shadow ray
-		{
-			double dist = (sample_pos - pos).length();
-			Vec brdf_factor;
-			hit_obj.mat.brdf->evaluateBRDF(norm, r.d, hit_obj.mat.c, sample_dir, &brdf_factor);
-			direct_light = direct_light + brdf_factor.mul(sampled_light * abs(sample_dir.dot(norm))) * (1.0 / pos_pdf) * (cos_theta_light / (dist * dist));
-		}
-	}
-	return direct_light;
-}
-void lightSampleE(Object *light, Ray *r, Vec *f) // Cosine Importance Sampling of Photon Directions
-{
-	float pos_pdf;
-	Vec light_normal;
-	Vec sample_pos = light->samplePos(&pos_pdf, &light_normal);
-	Vec disk_sample = concentricDiskSample();
-	double z = sqrt(MAX(0.0, 1 - disk_sample.x * disk_sample.x - disk_sample.y * disk_sample.y));
-	Vec sample_dir = Vec(disk_sample.x, disk_sample.y, z);
-	Vec v1, v2, n;
-	n = light_normal;
-	v1 = ((fabs(n.x) > .1 ? Vec(0, 1) : Vec(1)) % n).norm();
-	v2 = n % v1;
-	sample_dir = v1 * sample_dir.x + v2 * sample_dir.y + n * sample_dir.z;
-	*r = Ray(sample_pos, sample_dir);
-	float dir_pdf = MAX(light_normal.dot(sample_dir), 0) / PI;
-	if (dir_pdf <= 0.0)
-	{
-		*f = Vec();
-		return;
-	}
-	*f = light->e * MAX(light_normal.dot(sample_dir), 0) * (1.0 / pos_pdf) * (1.0 / dir_pdf);
-}
-
-void saveImage(std::vector<HPoint *> *hitpoints, int w, int h, int iterations, int photons_per_pass, double elapsed_time, int scene_nr, std::string folder_name, bool sppm)
-{
-	Vec *c = new Vec[w * h];
-	for (auto hp : *hitpoints)
-	{
-		int i = hp->pix;
-		c[i] = c[i] + hp->flux * (1.0 / (PI * hp->r2 * iterations * photons_per_pass)) + hp->direct / iterations;
-	}
-	std::string time_str = std::string("");
-	std::stringstream stream;
-	stream << std::fixed << std::setprecision(2) << elapsed_time;
-	time_str = stream.str() + std::string("s");
-	FILE *file = fopen((folder_name + "/" + time_str + "_" + std::to_string(iterations) + "r" + ".ppm").c_str(), "w");
-	fprintf(file, "P3\n%d %d\n%d\n", w, h, 255);
-	for (int i = w * h; i--;)
-	{
-		fprintf(file, "%d %d %d ", toInt(c[i].x), toInt(c[i].y), toInt(c[i].z));
-	}
-	fclose(file);
-}
 
 void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throughput, HPoint *hitp = nullptr, bool emissive = true)
 {
