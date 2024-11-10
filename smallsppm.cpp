@@ -945,9 +945,10 @@ void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throug
 	{
 		if (!brdf->isSpecular() && !brdf->isGlossy() && (dpt > 1 || !curr_scene_desc->direct_sampling)) // ignore direct light, was already accounted for in the measurement point
 		{
-			// strictly speaking, '#pragma omp critical' should be used here.
+			// Strictly speaking, '#pragma omp critical' should be used here.
 			// It usually works without artifacts since photons rarely
 			// contribute to the same measurement points at the same time.
+			// It is significantly faster this way but can be changed if needed.
 			hitpoint_kdtree->update(hitpoint_kdtree->root, x, fl, r, n, obj); 
 		}
 		Vec new_d;
