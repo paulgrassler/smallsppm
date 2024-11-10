@@ -479,8 +479,8 @@ Vec max(const Vec &a, const Vec &b) {
 }
 class HitPointKDTree {
 	private:
-    	int n;
-    	HPoint** hitpoints;
+    		int n;
+    		HPoint** hitpoints;
 		HitPointKDTreeNode* build(int l, int r, int d) {
 			HitPointKDTreeNode *p = new HitPointKDTreeNode;
 			p->min = Vec(1e100, 1e100, 1e100);
