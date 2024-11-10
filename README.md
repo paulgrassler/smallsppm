@@ -126,3 +126,6 @@ Object *scene1[] = {
 smallsppm.exe <Number of Rounds> 1 <Max Time>
 ```
 
+~10min render of the example scene:
+
+![ExampleRender](/example_scene_10min.png)
