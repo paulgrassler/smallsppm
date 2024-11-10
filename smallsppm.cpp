@@ -104,7 +104,7 @@ class AABB
 		}
 };
 
-enum Refl_t {PHONG, SPEC, REFR};  // material types, used in radiance()
+enum Refl_t {PHONG, SPEC, REFR};  // material types
 
 class BRDF {
 	public:
@@ -569,7 +569,6 @@ class SceneDescription {
 };
 
 HitPointKDTree *hitpoint_kdtree;
-std::vector<HPoint *> *hitpoints;
 SceneDescription *curr_scene_desc;
 
 std::vector<Triangle *> createBlock(float width, float height, float depth, bool without_top = false)
@@ -661,59 +660,20 @@ Vec default_sensor_direction(0, -0.06, -1);
 
 Object *scene1[] = {
   new Sphere(1e5, Vec( -1e5 -BOX_HALF_X,0,0), 			Vec(), 				Material(Vec(.75,.25,.25), new BRDF_PHONG())),//Left
-  new Sphere(1e5, Vec(1e5 + BOX_HALF_X,0,0), 			Vec(), 				Material(Vec(.25,.25,.75), new BRDF_PHONG())),//Right
+  new Sphere(1e5, Vec(1e5 + BOX_HALF_X,0,0), 			Vec(), 				Material(Vec(1, 1, 1) * .999, new BRDF_SPEC())),//Right
   new Sphere(1e5, Vec(0, 0, -1e5 - BOX_HALF_Z), 		Vec(), 				Material(Vec(.75,.75,.75), new BRDF_PHONG())),//Back
   new Sphere(1e5, Vec(0,0,+1e5+ 3 * BOX_HALF_Z - 0.5), 	Vec(), 				Material(Vec(), new BRDF_PHONG())),//Front
-  new Sphere(1e5, Vec(0, -1e5 - BOX_HALF_Y, 0), 		Vec(), 				Material(Vec(.25,.75,.25), new BRDF_PHONG())),//Bottomm
+  new Sphere(1e5, Vec(0, -1e5 - BOX_HALF_Y, 0), 		Vec(), 				Material(Vec(.25,.25,.75), new BRDF_PHONG())),//Bottomm
   new Sphere(1e5, Vec(0,1e5 + BOX_HALF_Y, 0),			Vec(), 				Material(Vec(.75,.75,.75), new BRDF_PHONG())),//Top
   new Sphere(0.8,Vec(-1.3, -BOX_HALF_Y + 0.8, -1.3), 	Vec(), 				Material(Vec(1, 1, 1)*.999, new BRDF_PHONG(0.0, 1.0, 25))),//Glossy
-  new Trimesh(createRectangle(1.0, 0, 1.0), Vec(0, BOX_HALF_Y - EPS, 0), Vec(1, 1, 1) * 10, Material(Vec(), new BRDF_PHONG()))
+  new Sphere(0.6, Vec(BOX_HALF_X * 0.7, -BOX_HALF_Y + 0.6, 0), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR())),
+  new Trimesh(createRectangle(0.01, 0, 0.01), Vec(0, BOX_HALF_Y - EPS, 0), Vec(1, 1, 1) * 200000, Material(Vec(), new BRDF_PHONG())) //Light
   };
 
 SceneDescription scene_desc1(scene1, sizeof(scene1) / sizeof(Object *), 
 default_sensor_origin, default_sensor_direction, scene1[sizeof(scene1) / sizeof(Object *) - 1], 0.03, true);
 
-Object *scene16[] = {
-  new Sphere(1e5, Vec( -1e5 -BOX_HALF_X,0,0), Vec(), Material(Vec(.999, .999, .999), new BRDF_PHONG(0.0, 1.0, 2000))),//Left
-  new Sphere(1e5, Vec(1e5 + BOX_HALF_X,0,0),Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_SPEC())),//Right
-  new Sphere(1e5, Vec(0, 0, -1e5 - BOX_HALF_Z),     Vec(), Material(Vec(.75,.75,.75), new BRDF_PHONG())),//Back
-  new Sphere(1e5, Vec(0,0,+1e5+ 3 * BOX_HALF_Z - 0.5), Vec(), Material(Vec(), new BRDF_PHONG())),//Front
-  new Sphere(1e5, Vec(0, -1e5 - BOX_HALF_Y, 0),    Vec(), Material(Vec(.999, .999, .999), new BRDF_PHONG(0.0, 1.0, 500))),//Bottom
-  new Sphere(1e5, Vec(0,1e5 + BOX_HALF_Y, 0),Vec(), Material(Vec(.75,.75,.75), new BRDF_PHONG())),//Top
-  //Material Spheres
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 0, -BOX_HALF_Y + 0.3 + EPS + 0.1, 4 - 2 * 1), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR()), Vec(0, 0.2, 0)),
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 1, -BOX_HALF_Y + 0.3 + EPS, 4 - 2 * 1), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 10)), Vec(0, 0.2, 0)),
-  new Sphere(0.3,  Vec(-BOX_HALF_X + 0.5 + 1.05 * 2, -BOX_HALF_Y + 0.3 + EPS, 4 - 2 * 1), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 50)), Vec(0, 0.2, 0)),
-  new Sphere(0.3,  Vec(-BOX_HALF_X + 0.5 + 1.05 * 3, -BOX_HALF_Y + 0.3 + EPS, 4 - 2 * 1), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 2000)), Vec(0, 0.2, 0)),
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 4, -BOX_HALF_Y + 0.3 + EPS + 0.1, 4 - 2 * 1), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR()), Vec(0, 0.2, 0)),
-  
-  new Trimesh(createBlock(2 * BOX_HALF_X, 0.8, 1.55, true), Vec(0, -BOX_HALF_Y + 0.4, 4 - 2 * 2 - 0.475), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 500))),//Block
-  new Trimesh(createRectangle(2 * BOX_HALF_X, 0.0, 1.55, true), Vec(0, -BOX_HALF_Y + 0.8, 4 - 2 * 2 - 0.475), Vec(), Material(Vec(0.25, 0.25, 0.75), new BRDF_PHONG())),//Base
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 0, -BOX_HALF_Y + 0.3 + EPS + 0.8 + 0.1, 4 - 2 * 2), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR()), Vec(0, 0.2, 0)),
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 1, -BOX_HALF_Y + 0.3 + EPS + 0.8, 4 - 2 * 2), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 10)), Vec(0, 0.2, 0)),
-  new Sphere(0.3,  Vec(-BOX_HALF_X + 0.5 + 1.05 * 2, -BOX_HALF_Y + 0.3 + EPS + 0.8, 4 - 2 * 2), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 50)), Vec(0, 0.2, 0)),
-  new Sphere(0.3,  Vec(-BOX_HALF_X + 0.5 + 1.05 * 3, -BOX_HALF_Y + 0.3 + EPS + 0.8, 4 - 2 * 2), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 2000)), Vec(0, 0.2, 0)),
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 4, -BOX_HALF_Y + 0.3 + EPS + 0.8 + 0.1, 4 - 2 * 2), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR()), Vec(0, 0.2, 0)),
-  
-  new Trimesh(createBlock(2 * BOX_HALF_X, 1.6, 1.55), Vec(0, -BOX_HALF_Y + 0.8, 4 - 2 * 3 - 0.125), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 500))),//Block
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 0, -BOX_HALF_Y + 0.3 + EPS + 1.6 + 0.1, 4 - 2 * 3), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR()), Vec(0, 0.2, 0)),
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 1, -BOX_HALF_Y + 0.3 + EPS + 1.6, 4 - 2 * 3), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 10)), Vec(0, 0.2, 0)),
-  new Sphere(0.3,  Vec(-BOX_HALF_X + 0.5 + 1.05 * 2, -BOX_HALF_Y + 0.3 + EPS + 1.6, 4 - 2 * 3), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 50)), Vec(0, 0.2, 0)),
-  new Sphere(0.3,  Vec(-BOX_HALF_X + 0.5 + 1.05 * 3, -BOX_HALF_Y + 0.3 + EPS + 1.6, 4 - 2 * 3), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 2000)), Vec(0, 0.2, 0)),
-  new Sphere(0.3, Vec(-BOX_HALF_X + 0.5 + 1.05 * 4, -BOX_HALF_Y + 0.3 + EPS + 1.6 + 0.1, 4 - 2 * 3), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR()), Vec(0, 0.2, 0)),
-  //LIGHT GRID
-//  new Trimesh(createBlock(2.0, 0.1, 2.0), Vec(0, BOX_HALF_Y - 0.2, 0), Vec(), Vec(.75, .75, .75), BRDF(PHONG)),
-  //new Trimesh(createRectangle(0.01, 0.0, 0.01), Vec(0, BOX_HALF_Y - EPS, 0), Vec(.999, .999, .999) * 200000, Vec(), BRDF(PHONG)),//Block
-  new Trimesh(createRectangle(0.001, 0.0, 0.001), Vec(0, BOX_HALF_Y - EPS, 0), Vec(.999, .999, .999) * 20000000, Material(Vec(), new BRDF_PHONG())),//Block
-//   new Sphere(0.6, Vec(BOX_HALF_X - 0.6,BOX_HALF_Y - 0.6,-BOX_HALF_Z + 0.6),        Vec(), Vec(.999, .999, .999), BRDF(PHONG)),//Middle
-//   new Sphere(0.1, Vec(BOX_HALF_X - 0.1,BOX_HALF_Y - 0.1,-BOX_HALF_Z + 0.1), Vec(1, 1, 1) * 5000, Vec(), BRDF(PHONG)) //LIGHT - always at last position
-};
-
-SceneDescription scene_desc16(scene16, sizeof(scene16) / sizeof(Object *), 
-Vec(0, 0, 2.5 * BOX_HALF_Z), default_sensor_direction, 
-scene16[sizeof(scene16) / sizeof(Object *) - 1], 0.04, true, false, true, 2.5 * BOX_HALF_Z, 0.075);
-
-SceneDescription scene_descriptors[] = {scene_desc1, scene_desc16};
+SceneDescription scene_descriptors[] = {scene_desc1};
 
 // find the closest intersection
 inline bool intersect(const Ray &r,double &t,int &id, Vec &normal){
@@ -850,7 +810,6 @@ void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throug
 	if(!intersect(r,t,id,n)||(dpt>=20))return;
 	const Object &obj = *(curr_scene_desc->scene[id]); 
 	Vec x=r.o+r.d*t, f=obj.mat.c;
-	Vec nl=n.dot(r.d)<0?n:n*-1; 
 	double p=f.x>f.y&&f.x>f.z?f.x:f.y>f.z?f.y:f.z;
 
 	BRDF *brdf = obj.mat.brdf;
@@ -942,13 +901,37 @@ int main(int argc, char *argv[]) {
 	std::ostringstream oss;
 	oss << std::put_time(&time_stamp_m, "%Y-%m-%d_%H-%M-%S");
 	std::string date_time_string = oss.str();
-	std::string folder_name = ("./output/sppm_scene_" + std::to_string(scene_nr) + "_" + radius_string + "_" + date_time_string).c_str();
+	std::string folder_name = ("./output/sppm_scene_" + std::to_string(scene_nr) + "_" + date_time_string).c_str();
 	fs::create_directories(folder_name);
+
+	//save metadata
+	std::ofstream metadata_file((folder_name + "/metadata.txt").c_str());
+
+	metadata_file << "scene_nr: " << scene_nr << std::endl;
+	metadata_file << "samps: " << samps << std::endl;
+	metadata_file << "photons_per_pass: " << photons_per_pass << std::endl;
+	metadata_file << "w: " << w << std::endl;
+	metadata_file << "h: " << h << std::endl;
+	metadata_file << "sensor_width: " << sensor_width << std::endl;
+	metadata_file << "sensor_height: " << sensor_height << std::endl;
+	metadata_file << "sensor_origin: " << sensor_origin.x << " " << sensor_origin.y << " " << sensor_origin.z << std::endl;
+	metadata_file << "sensor_direction: " << sensor_direction.x << " " << sensor_direction.y << " " << sensor_direction.z << std::endl;
+	metadata_file << "r_0: " << curr_scene_desc->r_0 << std::endl;
+	metadata_file << "direct_sampling: " << curr_scene_desc->direct_sampling << std::endl;
+	metadata_file << "motion_blur: " << curr_scene_desc->motion_blur << std::endl;
+	metadata_file << "dof: " << curr_scene_desc->dof << std::endl;
+	metadata_file << "S_i: " << S_i << std::endl;
+	metadata_file << "S_o: " << curr_scene_desc->S_o << std::endl;
+	metadata_file << "f_stop: " << curr_scene_desc->f_stop << std::endl;
+	metadata_file << "max_time: " << max_time << std::endl;
+
+	metadata_file.close();
+
 	printf("Rendering Scene %lld\n", scene_nr);
 	auto tstart = std::chrono::system_clock::now();
 
 	//initialize hitpoints
-	hitpoints = new std::vector<HPoint*>;
+	auto hitpoints = new std::vector<HPoint*>;
 	for (int y=0; y<h; y++){
 		for (int x=0; x<w; x++) {
 			HPoint *hitpoint = new HPoint;
@@ -1005,7 +988,7 @@ int main(int argc, char *argv[]) {
 		if (hitpoint_kdtree)
 			delete hitpoint_kdtree;
 		hitpoint_kdtree = new HitPointKDTree(hitpoints);
-		vw=Vec(1,1,1);
+		Vec initial_throughput=Vec(1,1,1);
 
 		#pragma omp parallel for schedule(dynamic, 1)	//PHOTON PASS
 		for(int j=0;j<photons_per_pass;j++){
@@ -1014,7 +997,7 @@ int main(int argc, char *argv[]) {
 			lightSampleE(curr_scene_desc->light, &r, &f);
 			if (curr_scene_desc->motion_blur)
 				r.time = time_sample;
-			trace(r,0,0>1,f,vw);
+			trace(r,0,0>1,f,initial_throughput);
 		}
         fprintf(stderr, "\rFinished Round %d/%d", round + 1, samps);
 		
