@@ -731,14 +731,14 @@ Vec default_sensor_origin(0, 0.25 * BOX_HALF_Y, 3 * BOX_HALF_Z - 1.0);
 Vec default_sensor_direction(0, -0.06, -1);
 
 Object *scene1[] = {
-	new Sphere(1e5, Vec(-1e5 - BOX_HALF_X, 0, 0), Vec(), Material(Vec(.75, .25, .25), new BRDF_PHONG())),					 // Left
-	new Sphere(1e5, Vec(1e5 + BOX_HALF_X, 0, 0), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_SPEC())),					 // Right
-	new Sphere(1e5, Vec(0, 0, -1e5 - BOX_HALF_Z), Vec(), Material(Vec(.75, .75, .75), new BRDF_PHONG())),					 // Back
-	new Sphere(1e5, Vec(0, 0, +1e5 + 3 * BOX_HALF_Z - 0.5), Vec(), Material(Vec(), new BRDF_PHONG())),						 // Front
-	new Sphere(1e5, Vec(0, -1e5 - BOX_HALF_Y, 0), Vec(), Material(Vec(.25, .25, .75), new BRDF_PHONG())),					 // Bottomm
-	new Sphere(1e5, Vec(0, 1e5 + BOX_HALF_Y, 0), Vec(), Material(Vec(.75, .75, .75), new BRDF_PHONG())),					 // Top
-	new Sphere(0.8, Vec(-1.3, -BOX_HALF_Y + 0.8, -1.3), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 25))), // Glossy
-	new Sphere(0.6, Vec(BOX_HALF_X * 0.7, -BOX_HALF_Y + 0.6, 0), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR())),
+	new Sphere(1e5, Vec(-1e5 - BOX_HALF_X, 0, 0), Vec(), Material(Vec(.75, .25, .25), new BRDF_PHONG())),							   // Left
+	new Sphere(1e5, Vec(1e5 + BOX_HALF_X, 0, 0), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_SPEC())),							   // Right
+	new Sphere(1e5, Vec(0, 0, -1e5 - BOX_HALF_Z), Vec(), Material(Vec(.75, .75, .75), new BRDF_PHONG())),							   // Back
+	new Sphere(1e5, Vec(0, 0, +1e5 + 3 * BOX_HALF_Z - 0.5), Vec(), Material(Vec(), new BRDF_PHONG())),								   // Front
+	new Sphere(1e5, Vec(0, -1e5 - BOX_HALF_Y, 0), Vec(), Material(Vec(.25, .25, .75), new BRDF_PHONG())),							   // Bottom
+	new Sphere(1e5, Vec(0, 1e5 + BOX_HALF_Y, 0), Vec(), Material(Vec(.75, .75, .75), new BRDF_PHONG())),							   // Top
+	new Sphere(0.8, Vec(-1.3, -BOX_HALF_Y + 0.8, -1.3), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_PHONG(0.0, 1.0, 25))),		   // Glossy
+	new Sphere(0.6, Vec(BOX_HALF_X * 0.7, -BOX_HALF_Y + 0.6, 0), Vec(), Material(Vec(1, 1, 1) * .999, new BRDF_REFR())),			   // Refractive
 	new Trimesh(createRectangle(0.01, 0, 0.01), Vec(0, BOX_HALF_Y - EPS, 0), Vec(1, 1, 1) * 200000, Material(Vec(), new BRDF_PHONG())) // Light
 };
 
@@ -973,6 +973,12 @@ int main(int argc, char *argv[])
 	Vec sensor_origin, sensor_direction;
 	double sensor_width = 0.036, sensor_height = 0.024; // 4:3
 	double S_i = 0.03;
+
+	if (scene_nr > sizeof(scene_descriptors) / sizeof(SceneDescription))
+	{
+		printf("Scene not found. Make sure you entered the number of an existing scene!\n");
+		exit(-1);
+	}
 
 	// set up scene and camera
 	curr_scene_desc = &(scene_descriptors[scene_nr - 1]);
