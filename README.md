@@ -1,6 +1,6 @@
 # smallsppm
 
-Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implemenation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). I based this implementation on a [small progressive photon mapper by Hachisuka](https://cs.uwaterloo.ca/~thachisu/smallppm_exp.cpp) and used a kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM). Features include area light sources, a thin lens model, Motion Blur, the modified Phong model for glossy reflections and direct light sampling.
+Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implemenation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). I based this implementation on a [small progressive photon mapper by Hachisuka](https://cs.uwaterloo.ca/~thachisu/smallppm_exp.cpp) and used a kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM). Features include area light sources, a thin lens model, Motion Blur, the modified Phong model for glossy reflections, direct light sampling and some more.
 
 ## Quick Start
 To render a scene with smallsppm, first compile the program with e.g. g++:
@@ -15,7 +15,7 @@ Then execute it with:
 smallsppm.exe <Number of Rounds> <Scene Number> <Max Time>
 ```
 
-This command will render the corresponding scene with \<Number of Rounds\> SPPM iterations. An output folder will be created if it does not exist already and a subfolder with date, time, scene number and initial radius will contain the generated renderings. Images will be created at different iteration checkpoints and at the end of the process. It will stop early, if the elapsed time reaches the specified \<Max Time\>.
+This command will render the corresponding scene with \<Number of Rounds\> SPPM iterations. An output folder will be created if it does not exist already and a subfolder with date, time, scene number and initial radius will contain the generated renderings. Images will be created at different iteration checkpoints and at the end of the process. It will stop early if the elapsed time reaches the specified \<Max Time\>.
 
 Iteration checkpoints are specified here:
 
@@ -37,7 +37,7 @@ There is a variety of different scene objects that can be used, which we will go
 Sphere(double rad_, Vec p_, Vec e_, Vec c_, BRDF brdf_, Vec direction_ = Vec())
 ```
 
-The constructor takes the sphere radius (rad_), its position (p_), emission (e_), albedo (c_), BRDF (brdf_) and direction (direction_) in case of scenes with Motion Blur.
+The constructor takes the sphere radius (rad_), its position (p_), emission (e_), albedo (c_), BRDF (brdf_), and direction (direction_) in case of scenes with Motion Blur. The direction specifies a vector along which the object will be moved during the shutter interval. More complex motions are not supported.
 
 **Trimesh**
 
@@ -45,7 +45,7 @@ The constructor takes the sphere radius (rad_), its position (p_), emission (e_)
 Trimesh(std::vector<Triangle *> triangles_, Vec p_, Vec e_, Vec c_, BRDF brdf_)
 ```
 
-The constructor takes a vector of Triangle objects (triangles_), the position of the mesh (p_), its emission (e_), albedo (c_) and BRDF (brdf_).
+The constructor takes a vector of Triangle objects (triangles_), the position of the mesh (p_), its emission (e_), albedo (c_), and BRDF (brdf_).
 
 **Triangle**
 
@@ -61,7 +61,7 @@ Triangles are defined by the position of their three points (a_, b_, c_). They s
 Cylinder(double rad_, double length_, Vec p_, Vec e_, Vec c_, BRDF brdf_)
 ```
 
-The cylinder constructor takes a radius (rad_), the length of the cylinder (length_), its position (p_), emission (e_), albedo (c_) and BRDF (brdf_). Only upright cylinders are supported.
+The cylinder constructor takes a radius (rad_), the length of the cylinder (length_), its position (p_), emission (e_), albedo (c_), and BRDF (brdf_). Only upright cylinders are supported.
 
 **BRDF**
 
@@ -117,7 +117,7 @@ Object *scene1[] = {
  SceneDescription scene_descriptors[] = {scene_desc1};
  ```
 
- Now you should be able to render it, when calling
+ Now you should be able to render it when calling
 
 ```terminal
 smallsppm.exe <Number of Rounds> 1 <Max Time>
