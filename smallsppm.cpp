@@ -509,6 +509,7 @@ public:
 	}
 };
 
+//This kd-tree iplementation is from https://github.com/shizhouxing/SPPM/
 class HitPointKDTreeNode
 {
 public:
