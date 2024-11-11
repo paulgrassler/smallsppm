@@ -1,6 +1,6 @@
 # smallsppm
 
-Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implementation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). An existing kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM) was used. The most important features include area light sources, a thin lens model for Depth of Field, Motion Blur for simple sphere movements, the modified Phong model for glossy reflections, and direct light sampling.
+Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implementation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). An existing kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM) was used (license is included at the bottom of this file). The most important features include area light sources, a thin lens model for Depth of Field, Motion Blur for simple sphere movements, the modified Phong model for glossy reflections, and direct light sampling.
 
 ## Quick Start
 To render a scene with smallsppm, first compile the program with e.g. g++:
@@ -129,3 +129,29 @@ smallsppm.exe <Number of Rounds> 1 <Max Time>
 ~10min render of the example scene:
 
 ![ExampleRender](/example_scene_10min.png)
+
+## KD-Tree License
+
+```text
+MIT License
+
+Copyright (c) 2018 Zhouxing Shi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
