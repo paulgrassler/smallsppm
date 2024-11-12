@@ -1,6 +1,6 @@
 # smallsppm
 
-Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implementation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). An existing kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM) was used (license is included at the bottom of this file). The most important features include area light sources, a thin lens model for Depth of Field, Motion Blur for simple sphere movements, the modified Phong model for glossy reflections, and direct light sampling.
+Compact implementation of the Stochastic Progressive Photon Mapping algorithm by [Hachisuka and Jensen, 2009](https://doi.org/10.1145/1618452.1618487). The goal was to create a single source file implementation in the style of [smallpt by Kevin Beason](https://www.kevinbeason.com/smallpt/). An existing kd-tree implementation from another [SPPM implementation](https://github.com/shizhouxing/SPPM) was used (license is included at the bottom of this file). The most important features include area light sources, a thin lens model for Depth of Field, Motion Blur for simple sphere movements, the modified Phong model for glossy reflections, and direct light sampling. An even more compact version of the program is also included (*smallsppm_compact.cpp*). it sacrifices some clarity to provide the same features in less than 800 lines of code.
 
 ## Quick Start
 To render a scene with smallsppm, first compile the program with e.g. g++:
@@ -15,7 +15,7 @@ Then execute it with:
 smallsppm.exe <Number of Rounds> <Scene Number> <Max Time>
 ```
 
-This command will render the corresponding scene (\<Scene Number\> refers to its position in the scene_descriptors array) with \<Number of Rounds\> SPPM iterations. An output folder will be created if it does not exist already and a subfolder with date, time, scene number and initial radius will contain the generated renderings. Images will be created at different iteration checkpoints and at the end of the process. It will stop early if the elapsed time reaches the specified \<Max Time\> (in seconds).
+This command will render the corresponding scene (\<Scene Number\> refers to its position in the scene_descriptors array) with \<Number of Rounds\> SPPM iterations. An output folder will be created if it does not exist already and a subfolder with date, time and scene number will contain the generated renderings and a metadata text file. Images will be created at different iteration checkpoints and at the end of the process. It will stop early if the elapsed time reaches the specified \<Max Time\> (in seconds).
 
 ### Creating a new Scene
 
