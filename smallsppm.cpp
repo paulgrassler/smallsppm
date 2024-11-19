@@ -565,7 +565,7 @@ public:
 		del(root);
 		delete[] hitpoints;
 	}
-	void update(HitPointKDTreeNode *p, Vec photon_pos, const Vec fl, const Ray r, const Vec n, const Object &obj)
+	void contribute(HitPointKDTreeNode *p, Vec photon_pos, const Vec fl, const Ray r, const Vec n, const Object &obj)
 	{
 		if (!p)
 			return;
@@ -596,9 +596,9 @@ public:
 			hitpoint->flux = (hitpoint->flux + brdf_factor.mul(fl)) * g;
 		}
 		if (p->ls)
-			update(p->ls, photon_pos, fl, r, n, obj);
+			contribute(p->ls, photon_pos, fl, r, n, obj);
 		if (p->rs)
-			update(p->rs, photon_pos, fl, r, n, obj);
+			contribute(p->rs, photon_pos, fl, r, n, obj);
 		p->maxr2 = p->hitpoint->r2;
 		if (p->ls && p->ls->hitpoint->r2 > p->maxr2)
 			p->maxr2 = p->ls->hitpoint->r2;
@@ -698,7 +698,7 @@ Vec lightSampleDirect(Ray r, Vec pos, Vec norm, int hit_id, const Object &hit_ob
 	return direct_light;
 }
 
-void lightSampleE(Object *light, Ray *r, Vec *f) // Cosine Importance Sampling of Photon Directions
+void lightSampleE(Object *light, Ray *r, Vec *f, double time_sample) // Cosine Importance Sampling of Photon Directions
 {
 	float pos_pdf;
 	Vec light_normal;
@@ -718,6 +718,8 @@ void lightSampleE(Object *light, Ray *r, Vec *f) // Cosine Importance Sampling o
 		*f = Vec();
 		return;
 	}
+	if (curr_scene_desc->motion_blur)
+		r->time = time_sample;
 	*f = light->e * MAX(light_normal.dot(sample_dir), 0) * (1.0 / pos_pdf) * (1.0 / dir_pdf);
 }
 
@@ -876,6 +878,24 @@ SceneDescription scene_desc1(scene1, sizeof(scene1) / sizeof(Object *),
 
 SceneDescription scene_descriptors[] = {scene_desc1};
 
+void hitpointSetup(HPoint *hitp, Vec &f, const Vec &throughput, const Vec &x, const Vec &n, const Ray &r, BRDF *brdf, const Object &obj, bool emissive, int id)
+{
+    hitp->f = f.mul(throughput);
+    hitp->pos = x;
+    hitp->nrm = n;
+    hitp->valid = true;
+    hitp->time = r.time;
+    hitp->brdf = brdf;
+    if ((obj.e.x > 0 || obj.e.y > 0 || obj.e.z > 0))
+    {
+        if (emissive)
+            hitp->direct = hitp->direct + throughput.mul(obj.e);
+        hitp->valid = false;
+    }
+    if (curr_scene_desc->direct_sampling)
+        hitp->direct = hitp->direct + throughput.mul(lightSampleDirect(r, x, n, id, obj));
+}
+
 void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throughput, HPoint *hitp = nullptr, bool emissive = true)
 {
 	double t;
@@ -892,25 +912,10 @@ void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throug
 
 	if (eye_ray)
 	{
-		if (!brdf->isSpecular() && !brdf->isGlossy()) // only create a hitpoint if non-specular/non-diffuse material
+		if (!brdf->isSpecular() && !brdf->isGlossy()) // only set up a hitpoint if non-specular/non-diffuse material
 		{
-			hitp->f = f.mul(throughput);
-			hitp->pos = x;
-			hitp->nrm = n;
-			hitp->valid = true;
-			hitp->time = r.time;
-			hitp->brdf = brdf;
-			if ((obj.e.x > 0 || obj.e.y > 0 || obj.e.z > 0))
-			{
-				if (emissive)
-					hitp->direct = hitp->direct + throughput.mul(obj.e);
-				hitp->valid = false;
-			}
-			if (curr_scene_desc->direct_sampling)
-			{
-				hitp->direct = hitp->direct + throughput.mul(lightSampleDirect(r, x, n, id, obj));
-			}
-		}
+            hitpointSetup(hitp, f, throughput, x, n, r, brdf, obj, emissive, id);
+        }
 		else
 		{
 			Vec new_d;
@@ -935,7 +940,7 @@ void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throug
 			// It usually works without artifacts since photons rarely
 			// contribute to the same measurement points at the same time.
 			// It is significantly faster this way but can be changed if needed.
-			hitpoint_kdtree->update(hitpoint_kdtree->root, x, fl, r, n, obj); 
+			hitpoint_kdtree->contribute(hitpoint_kdtree->root, x, fl, r, n, obj); 
 		}
 		Vec new_d;
 		double pdf = 0.0;
@@ -949,6 +954,38 @@ void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throug
 		if (rand01() < p)
 			trace(Ray(x, new_d, r.time), dpt, eye_ray, fl.mul(brdf_f) * (1. / p) * abs(n.dot(new_d)) * (1.0 / pdf), throughput);
 	}
+}
+
+void sampleCameraRay(Vec &cx, int x, int w, Vec &cy, int y, int h, Vec &sensor_origin, Vec &sensor_direction, double S_i, double aperture_r, double time_sample, Ray *new_camera_ray)
+{
+    double offset_x = rand01() - 0.5;
+    double offset_y = rand01() - 0.5;
+    Vec sensor_sample = cx * ((x + 0.5 + offset_x) / w - 0.5) + cy * (-(y + 0.5 + offset_y) / h + 0.5);
+    sensor_sample = sensor_sample + sensor_origin;
+    Vec lens_center = sensor_origin + sensor_direction * S_i;
+    Vec d, start_point;
+    if (curr_scene_desc->dof) // if depth of field is enabled, sample a lens position
+    {
+        Ray center_ray(lens_center, (lens_center - sensor_sample).norm());
+        Vec focus_plane_point = lens_center + sensor_direction * curr_scene_desc->S_o;
+        Vec focus_plane_normal = sensor_direction * -1;
+        double t = 0.0;
+        if (!rayPlaneIntersection(focus_plane_point, focus_plane_normal, center_ray, &t))
+            printf("Something went very wrong!\n");
+        Vec focus_point = center_ray.o + center_ray.d * t;
+        Vec lens_sample = uniformDiskSample(aperture_r, lens_center);
+        start_point = lens_sample;
+        d = (focus_point - lens_sample).norm();
+    }
+    else
+    {
+        start_point = lens_center;
+        d = (lens_center - sensor_sample).norm();
+    }
+    double time = 0.0;
+    if (curr_scene_desc->motion_blur)
+        time = time_sample;
+    *new_camera_ray = Ray(start_point, d, time);
 }
 
 int main(int argc, char *argv[])
@@ -1039,37 +1076,11 @@ int main(int argc, char *argv[])
 		{
 			for (int x = 0; x < w; x++)
 			{
-				HPoint *curr_hp = hitpoints->at(y * w + x);
+				Ray new_camera_ray;
+                sampleCameraRay(cx, x, w, cy, y, h, sensor_origin, sensor_direction, S_i, aperture_r, time_sample, &new_camera_ray);
+                HPoint *curr_hp = hitpoints->at(y * w + x);
 				curr_hp->valid = false;
-				curr_hp->f = Vec(1, 1, 1);
-				double offset_x = rand01() - 0.5;
-				double offset_y = rand01() - 0.5;
-				Vec sensor_sample = cx * ((x + 0.5 + offset_x) / w - 0.5) + cy * (-(y + 0.5 + offset_y) / h + 0.5);
-				sensor_sample = sensor_sample + sensor_origin;
-				Vec lens_center = sensor_origin + sensor_direction * S_i;
-				Vec d, start_point;
-				if (curr_scene_desc->dof) // if depth of field is enabled, sample a lens position
-				{
-					Ray center_ray(lens_center, (lens_center - sensor_sample).norm());
-					Vec focus_plane_point = lens_center + sensor_direction * curr_scene_desc->S_o;
-					Vec focus_plane_normal = sensor_direction * -1;
-					double t = 0.0;
-					if (!rayPlaneIntersection(focus_plane_point, focus_plane_normal, center_ray, &t))
-						printf("Something went very wrong!\n");
-					Vec focus_point = center_ray.o + center_ray.d * t;
-					Vec lens_sample = uniformDiskSample(aperture_r, lens_center);
-					start_point = lens_sample;
-					d = (focus_point - lens_sample).norm();
-				}
-				else
-				{
-					start_point = lens_center;
-					d = (lens_center - sensor_sample).norm();
-				}
-				double time = 0.0;
-				if (curr_scene_desc->motion_blur)
-					time = time_sample;
-				trace(Ray(start_point, d, time), 0, true, Vec(), Vec(1, 1, 1), curr_hp);
+				trace(new_camera_ray, 0, true, Vec(), Vec(1, 1, 1), curr_hp);
 			}
 		}
 
@@ -1077,16 +1088,14 @@ int main(int argc, char *argv[])
 		if (hitpoint_kdtree)
 			delete hitpoint_kdtree;
 		hitpoint_kdtree = new HitPointKDTree(hitpoints);
-		Vec initial_throughput = Vec(1, 1, 1);
 
 		#pragma omp parallel for schedule(dynamic, 1) // PHOTON PASS
 		for (int j = 0; j < photons_per_pass; j++)
 		{
 			Ray r;
 			Vec f;
-			lightSampleE(curr_scene_desc->light, &r, &f);
-			if (curr_scene_desc->motion_blur)
-				r.time = time_sample;
+			Vec initial_throughput = Vec(1, 1, 1);
+			lightSampleE(curr_scene_desc->light, &r, &f, time_sample);
 			trace(r, 0, 0 > 1, f, initial_throughput);
 		}
 		fprintf(stderr, "\rFinished Round %d/%d", round + 1, samps);
