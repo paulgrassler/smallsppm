@@ -913,9 +913,7 @@ void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throug
 	if (eye_ray)
 	{
 		if (!brdf->isSpecular() && !brdf->isGlossy()) // only set up a hitpoint if non-specular/non-diffuse material
-		{
-            hitpointSetup(hitp, f, throughput, x, n, r, brdf, obj, emissive, id);
-        }
+			hitpointSetup(hitp, f, throughput, x, n, r, brdf, obj, emissive, id);
 		else
 		{
 			Vec new_d;
