@@ -565,7 +565,7 @@ public:
 		del(root);
 		delete[] hitpoints;
 	}
-	void contribute(HitPointKDTreeNode *p, Vec photon_pos, const Vec fl, const Ray r, const Vec n, const Object &obj)
+	void update(HitPointKDTreeNode *p, Vec photon_pos, const Vec fl, const Ray r, const Vec n, const Object &obj)
 	{
 		if (!p)
 			return;
@@ -596,9 +596,9 @@ public:
 			hitpoint->flux = (hitpoint->flux + brdf_factor.mul(fl)) * g;
 		}
 		if (p->ls)
-			contribute(p->ls, photon_pos, fl, r, n, obj);
+			update(p->ls, photon_pos, fl, r, n, obj);
 		if (p->rs)
-			contribute(p->rs, photon_pos, fl, r, n, obj);
+			update(p->rs, photon_pos, fl, r, n, obj);
 		p->maxr2 = p->hitpoint->r2;
 		if (p->ls && p->ls->hitpoint->r2 > p->maxr2)
 			p->maxr2 = p->ls->hitpoint->r2;
@@ -938,7 +938,7 @@ void trace(const Ray &r, int dpt, bool eye_ray, const Vec &fl, const Vec &throug
 			// It usually works without artifacts since photons rarely
 			// contribute to the same measurement points at the same time.
 			// It is significantly faster this way but can be changed if needed.
-			hitpoint_kdtree->contribute(hitpoint_kdtree->root, x, fl, r, n, obj); 
+			hitpoint_kdtree->update(hitpoint_kdtree->root, x, fl, r, n, obj); 
 		}
 		Vec new_d;
 		double pdf = 0.0;
